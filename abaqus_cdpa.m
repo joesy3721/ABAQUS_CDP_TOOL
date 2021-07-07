@@ -550,6 +550,7 @@ else % if compression softening is accounted for
     ratio=gfi_c/gfi_t_adjust;
     %set minimum to gfi ratio before strain shift
     set(handles.slider_gfi_ratio, 'min', ratio);
+    set(handles.slider_gfi_ratio, 'max', ratio+300);
     n=0;
     %initial factor split if ratio got exceeded
     m=2;
