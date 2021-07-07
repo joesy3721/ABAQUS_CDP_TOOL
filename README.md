@@ -14,3 +14,13 @@ You can export your data so you can simply include it in your ABAQUS .inp file b
 ** MATERIALS
 **
 *INCLUDE, Input = yourexportfilename.txt
+
+References:
+Compressive behavior:
+EN 1992-1-1:2004 + AC:2008 + AC:2010 + A1:2014 (D), Eq.(3.14), Tab.3.1
+Tensile behavior:
+G. Hofstetter, G. Meschke, Numerical Modeling of Concrete Cracking, Springer-Verlag Wien, 2011 (Doi: 10.1007/978-3-7091-0897-0)
+Compressive/Tensile Fracture Energy ratio:
+Hikaru Nakamura, Takeshi Higai, Compressive Fracture Energy and Fracture Zone Length of Concrete, 2011
+Abaqus Manual:
+https://help.3ds.com/HelpProductsDS.aspx
