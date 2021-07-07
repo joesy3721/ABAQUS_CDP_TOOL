@@ -22,7 +22,7 @@ function varargout = abaqus_cdpa(varargin)
 
 % Edit the above text to modify the response to help abaqus_cdpa
 
-% Last Modified by GUIDE v2.5 25-Jun-2021 07:41:59
+% Last Modified by GUIDE v2.5 07-Jul-2021 08:45:25
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -733,11 +733,11 @@ execute(handles)
 
 
 
-% --------------------------------------------------------------------
-function file_Callback(hObject, eventdata, handles)
-% hObject    handle to file (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
+% % --------------------------------------------------------------------
+% function file_Callback(hObject, eventdata, handles)
+% % hObject    handle to file (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
 
 
 % --------------------------------------------------------------------
@@ -746,7 +746,15 @@ function new_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-close(gcbf)
+button = questdlg('Do you really want to close the program?',...
+    handles.title,'Yes','No','No');
+
+switch button
+    case 'Yes'
+        delete(handles.figure1)
+    case 'No'
+end
+
 abaqus_cdpa
 
 
@@ -898,7 +906,9 @@ if (file)
     end
     
     %data
-    fprintf(fid,'*Material, name=CDPA\n');
+    fprintf(fid,strcat('*Material, name=',handles.edit_name.String,'\n'));
+    fprintf(fid,'*Density\n');
+    fprintf(fid,'2.4e-09\n');    
     fprintf(fid,'*Elastic\n');
     fprintf(fid,'%s, ',handles.edit_ecm.String);
     fprintf(fid,'0.2\n');
@@ -919,21 +929,6 @@ if (file)
 
     fclose(fid);
 end
-
-% --------------------------------------------------------------------
-function close_Callback(hObject, eventdata, handles)
-% hObject    handle to close (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-button = questdlg('Do you really want to close the program?',...
-    handles.title,'Yes','No','No');
-
-switch button
-    case 'Yes'
-        delete(handles.figure1)
-    case 'No'
-end
     
 
 % --- Executes when user attempts to close figure1.
@@ -943,7 +938,14 @@ function figure1_CloseRequestFcn(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: delete(hObject) closes the figure
-close_Callback(handles.close, eventdata, handles)
+button = questdlg('Do you really want to close the program?',...
+    handles.title,'Yes','No','No');
+
+switch button
+    case 'Yes'
+        delete(handles.figure1)
+    case 'No'
+end
 
 
 
@@ -1579,4 +1581,27 @@ function slider_decu_CreateFcn(hObject, eventdata, handles)
 % Hint: slider controls usually have a light gray background.
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+
+
+function edit_name_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_name (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_name as text
+%        str2double(get(hObject,'String')) returns contents of edit_name as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_name_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_name (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
 end
