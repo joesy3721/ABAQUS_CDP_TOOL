@@ -1,6 +1,9 @@
 # ABAQUS_CDP_TOOL
 This is a useful MatLab based tool to easily set up the Concrete Damaged Plasticity Model available in Abaqus. 
 
+Check out the tutorial on Youtube:
+https://www.youtube.com/watch?v=NtLSh5OsB5c
+
 Place the .fig and the .m file in the same folder and open and run the .m file in MatLab. 
 
 Start with specifying the name for your material in accordance to your section definition in Abaqus.
