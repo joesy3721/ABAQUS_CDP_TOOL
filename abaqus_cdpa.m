@@ -22,7 +22,7 @@ function varargout = abaqus_cdpa(varargin)
 
 % Edit the above text to modify the response to help abaqus_cdpa
 
-% Last Modified by GUIDE v2.5 07-Jul-2021 08:45:25
+% Last Modified by GUIDE v2.5 12-Jul-2021 11:41:10
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -90,6 +90,37 @@ function edit_fcm_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of edit_fcm as text
 %        str2double(get(hObject,'String')) returns contents of edit_fcm as a double
+
+% val = str2num(hObject.String);
+% maxi = 128;%MPa
+% if (val>maxi)
+%     val = maxi;
+% end
+% hObject.String = num2str(val,2);
+% handles.edit_fcm.Value = val;
+
+% set(handles.edit_fcm,'String',sprintf('%.f',val))
+
+val = str2double(hObject.String);
+
+if val<110
+    Ecm_set= round(21500*1*(val/10)^(1/3),-1);
+else
+    Ecm_set= 4700*sqrt(val);
+end
+
+if val>58
+    fctm_set = round(2.21*log(1+0.1*val),1);
+else
+    fctm_set = round(0.3*(val-8)^(2/3),1); 
+end
+
+Gfit_set=round(73/1000*val^0.18,3);
+
+set(handles.edit_ecm,'String',Ecm_set)
+set(handles.edit_fctm,'String',fctm_set)
+set(handles.edit_gfi,'String',Gfit_set)
+
 execute(handles)
 
 % --- Executes during object creation, after setting all properties.
@@ -113,6 +144,9 @@ function edit_ecm_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of edit_ecm as text
 %        str2double(get(hObject,'String')) returns contents of edit_ecm as a double
+
+
+
 execute(handles)
 
 % --- Executes during object creation, after setting all properties.
@@ -136,8 +170,34 @@ function execute(handles)
     % Compressive strength
     fcm = str2num(handles.edit_fcm.String);
     
+    % Young's Modulus range
+    if fcm<43
+        Ecm_low= 21500*0.65*(fcm/10)^(1/3);
+    elseif fcm>=43 && fcm<65
+        Ecm_low= 21500*0.75*(fcm/10)^(1/3);
+    elseif fcm>=65 && fcm<90
+        Ecm_low= 21500*0.85*(fcm/10)^(1/3);
+    elseif fcm>=90 && fcm<110
+        Ecm_low= 21500*0.95*(fcm/10)^(1/3);
+    elseif fcm>=110
+        Ecm_low= .999*4700*sqrt(fcm);
+    end
+    Ecm_high= 21500*1.2*(fcm/10)^(1/3);
+    
     % Young's Modulus
-    Ecm = str2num(handles.edit_ecm.String);
+    Ecm = str2double(handles.edit_ecm.String);
+    
+    if Ecm < Ecm_low 
+        Ecm = Ecm_low;
+        set(handles.text_ewarn,'string','Desired value too small.')
+        set(handles.edit_ecm,'String',Ecm)
+    elseif Ecm > Ecm_high
+        Ecm = Ecm_high;
+        set(handles.text_ewarn,'string','Desired value too big.')
+        set(handles.edit_ecm,'String',Ecm)
+    else
+        set(handles.text_ewarn,'string','')
+    end
     
     % maximal compression damage
     o_c_max = str2num(handles.edit_d_c.String);
@@ -345,11 +405,15 @@ ec1 = min([0.7*fcm^0.31,2.8]);
 %total strain at failure
 if fcm-8 < 50
     ecu1 = 3.5;
+elseif fcm > 98
+    ecu1 = 2.8;
 else
-    ecu1 = 2.8 + 27*((98-fcm)/100)^4
+    ecu1 = 2.8 + 27*((98-fcm)/100)^4;
 end
     
+
 %plasticity number
+% k = 1.05*Ecm*(ec1/1000/fcm);
 k = 1.05*Ecm*(ec1/1000/fcm);
 
 %strain at 0.4 * compressive strengt, end of elastic domain
@@ -357,6 +421,15 @@ e04f = 1/10 * (-sqrt(3)*sqrt(3*k^2+8*k-8)+3*k+4)*ec1;
 
 %strain at 0 bzw. 0.01* compressive strength
 e001 = 1/200 * (3*sqrt(11)*sqrt(99*k^2+4*k-4)+99*k+2)*ec1;
+
+% strain-values, if for small E values
+if ecu1 < e001
+   emax = ecu1;
+   num = 201;
+else
+   emax = e001;
+   num = 200;
+end
 
 %conversion of ec1 to inelastic strain
 inec1 = ec1-e04f-(1-0.4)*fcm/Ecm*1000; %bei ec1
@@ -377,8 +450,11 @@ if soft_check ~= 1
     handles.edit_gfi_ratio.Enable = 'off';
     set(handles.text_gfi_ratio,'BackgroundColor',[0.64 0.83 0.51])
     
-    % strain-values
-    ec = linspace(e04f,ecu1,100);  
+%     emax=min(e001,ecu1);  
+    ec = linspace(e04f,emax,200); 
+        
+%     % strain-values
+%     ec = linspace(e04f,ecu1,100);  
 
     eta = ec/ec1;   
 
@@ -388,7 +464,7 @@ if soft_check ~= 1
     %Plateau after fcm
     n=1;
     for i = sc_n
-        n = min([n+1,100]);
+        n = min([n+1,200]);
         if i>sc_n(n)
             sc_n(n)=1;
         end
@@ -402,24 +478,44 @@ if soft_check ~= 1
     
     %inelastic strain 
     ine = ec-e04f-(sc_n-sc_n(1))*fcm/Ecm*1000;
+        
+    %conversion of ecu1 or e001 to inelastic strain
+    inecu1 = emax-e04f-(1-0.4)*fcm/Ecm*1000; %either at ecu1 or e001
     
-    %conversion of ecu1 to inelastic strain
-    inecu1 = ecu1-e04f-(1-0.4)*fcm/Ecm*1000; %bei ecu1
-    
-    %Damage equation system system; curve goes through 0,0; inec1,o_c_ec;
-    %inecu1,o_c_max and has a horizontal tangent at inecu1,o_c_max
-    % o_c_max is the damage limit, o_c_ec is the damage when reaching fcm
-    Mat = [(inecu1/1000)^3 (inecu1/1000)^2 (inecu1/1000); (inec1/1000)^3 (inec1/1000)^2 (inec1/1000); 3*(inecu1/1000)^2 2*(inecu1/1000) 1];
-    Vec = [o_c_max; o_c_ec; 0];
-    %solve equation
-    Sol = Mat\Vec;
-    
-    %damage strain curve; polynomial function third order
-    o_c = Sol(1)*(ine/1000).^3 + Sol(2)*(ine/1000).^2 + Sol(3)*(ine/1000);
-    
+    if ec1/ecu1 < .9
+        %enable slider and edit field
+        set(handles.text74,'BackgroundColor',[1 0.41 0.16])
+        handles.slider_decu.Enable = 'on';
+        handles.edit_decu.Enable = 'on';  
+        %Damage equation system system; curve goes through 0,0; inec1,o_c_ec;
+        %inecu1,o_c_max and has a horizontal tangent at inecu1,o_c_max
+        % o_c_max is the damage limit, o_c_ec is the damage when reaching fcm
+        Mat = [(inecu1/1000)^3 (inecu1/1000)^2 (inecu1/1000); (inec1/1000)^3 (inec1/1000)^2 (inec1/1000); 3*(inecu1/1000)^2 2*(inecu1/1000) 1];
+        Vec = [o_c_max; o_c_ec; 0];
+        %solve equation
+        Sol = Mat\Vec; 
+        %damage strain curve; polynomial function third order
+        o_c = Sol(1)*(ine/1000).^3 + Sol(2)*(ine/1000).^2 + Sol(3)*(ine/1000);     
+    else
+        set(handles.text74,'BackgroundColor',[.78 0.6 0.51])
+        %export only possible when no warning occurs
+        handles.slider_decu.Enable = 'off';
+        handles.edit_decu.Enable = 'off';        
+        %Damage equation system system; curve goes through 0,0; inec1,o_c_ec;
+        %inecu1,o_c_max and has a horizontal tangent at inecu1,o_c_max
+        % o_c_max is the damage limit, o_c_ec is the damage when reaching fcm
+        Mat = [(inecu1/1000)^2 (inecu1/1000); 2*(inecu1/1000) 1];
+        Vec = [o_c_max;0];
+        %solve equation
+        Sol = Mat\Vec; 
+        %damage strain curve; polynomial function third order
+        o_c = Sol(1)*(ine/1000).^2 + Sol(2)*(ine/1000);
+        poi_c_right = 2;
+    end
+
     %check if damage data is correct
     for i=1:length(o_c)-1 
-        if o_c(i)>o_c(i+1) | o_c(i+1)<0
+        if round(o_c(i),3)>round(o_c(i+1),3) | round(o_c(i+1),3)<0
             flag=1;
             set(handles.text_warning_dam,'string','Error: Invalid COMPRESSIVE DAMAGE data. Negative and/or decreasing damage values occur. Adjust damage.')
             set(handles.text_warning_dam,'ForegroundColor',[1 0 0])
@@ -462,13 +558,15 @@ else % if compression softening is accounted for
     handles.edit_gfi_ratio.Enable = 'on';
     set(handles.text_gfi_ratio,'BackgroundColor',[0.39 0.83 0.07])
     
-    % strain-values
-    ec = linspace(e04f,ecu1,100);  
-   
+%     emax=min(e001,ecu1);  
+    ec = linspace(e04f,emax,200);
+
     eta = ec/ec1;   
 
     %normalized stress curve
+    
     sc_n = (k*eta-eta.^2)./(1+(k-2)*eta);
+    sc_ecu1=sc_n(end);
     
     %inelastic strain 
     ine = ec-e04f-(sc_n-sc_n(1))*fcm/Ecm*1000;
@@ -476,17 +574,41 @@ else % if compression softening is accounted for
     %determination of inelastic ecu1
     inecu1 = ine(end);
     
-    %Damage equation system system;
-    Mat = [(inecu1/1000)^3 (inecu1/1000)^2 (inecu1/1000); (inec1/1000)^3 (inec1/1000)^2 (inec1/1000); 3*(inecu1/1000)^2 2*(inecu1/1000) 1];
-    Vec = [o_c_max; o_c_ec; 0];
-    Sol = Mat\Vec;
-    
-    %damage strain curve
-    o_c = Sol(1)*(ine/1000).^3 + Sol(2)*(ine/1000).^2 + Sol(3)*(ine/1000);
+    if ec1/ecu1 < .9
+        %enable slider and edit field
+        set(handles.text74,'BackgroundColor',[1 0.41 0.16])
+        handles.slider_decu.Enable = 'on';
+        handles.edit_decu.Enable = 'on';  
+        %Damage equation system system; curve goes through 0,0; inec1,o_c_ec;
+        %inecu1,o_c_max and has a horizontal tangent at inecu1,o_c_max
+        % o_c_max is the damage limit, o_c_ec is the damage when reaching fcm
+        Mat = [(inecu1/1000)^3 (inecu1/1000)^2 (inecu1/1000); (inec1/1000)^3 (inec1/1000)^2 (inec1/1000); 3*(inecu1/1000)^2 2*(inecu1/1000) 1];
+        Vec = [o_c_max; o_c_ec; 0];
+        %solve equation
+        Sol = Mat\Vec; 
+        %damage strain curve; polynomial function third order
+        o_c = Sol(1)*(ine/1000).^3 + Sol(2)*(ine/1000).^2 + Sol(3)*(ine/1000);        
+    else
+        set(handles.text74,'BackgroundColor',[.78 0.6 0.51])
+        %disable slider and edit field
+        handles.slider_decu.Enable = 'off';
+        handles.edit_decu.Enable = 'off';        
+        %Damage equation system system; curve goes through 0,0; inec1,o_c_ec;
+        %inecu1,o_c_max and has a horizontal tangent at inecu1,o_c_max
+        % o_c_max is the damage limit, o_c_ec is the damage when reaching fcm
+        Mat = [(inecu1/1000)^2 (inecu1/1000); 2*(inecu1/1000) 1];
+        Vec = [o_c_max;0];
+        %solve equation
+        Sol = Mat\Vec; 
+        %damage strain curve; polynomial function third order
+        o_c = Sol(1)*(ine/1000).^2 + Sol(2)*(ine/1000);  
+        poi_c_right = 1;
+    end
     
     %check if damage data is correct
+    
     for i=1:length(o_c)-1 
-        if o_c(i)>o_c(i+1) | o_c(i+1)<0
+        if round(o_c(i),3)>round(o_c(i+1),3) | round(o_c(i+1),3)<0
             flag=1;
             set(handles.text_warning_dam,'string','Error: Invalid COMPRESSIVE DAMAGE data. Negative and/or decreasing damage values occur. Adjust damage.')
             set(handles.text_warning_dam,'ForegroundColor',[1 0 0])
@@ -504,7 +626,7 @@ else % if compression softening is accounted for
             break
         end
     end
-    
+
     % outputdata indices, equal spacing
     %find fcm index I
     [M,I] = max(sc_n);   
@@ -513,23 +635,40 @@ else % if compression softening is accounted for
     %from fcm to end, generate #poi_c_right indices and round them
     right=round(linspace(I,length(sc_n),poi_c_right));
     %combine
-    idx = [left,right(2:end),101];
-    
+    idx = [left,right(2:end),num];
+
     %weighting/shifting of softening branch for accurate gfi ratio
     %no shifting in hardening branch
     hardening=zeros(1,I-1);
-    %linear shifting in softening branch (zero at fcm, 1 at last value)
-    softening=linspace(0,1,100-length(hardening));
-    %due to simply appending the 0.01 stress value to the stress array,
-    %values are not evenly spaced, last value needs adaptions
-    weight=[hardening,softening, (ine001-ine(end))/(ine(end)-ine(end-1))*(softening(2)-softening(1))+1];
-    
-    %curve with 101 data points
-    %append 0.01 stress value
-    sc_n = [sc_n,0.01]; %normalized
-    ine = [ine,ine001];
-    o_c = [o_c,o_c_max];
-    
+
+    if emax == e001 %delete last value if e001 is last total strain value 
+        %linear shifting in softening branch (zero at fcm, 1 at last value)
+        softening=linspace(0,1,num-length(hardening));
+        %values are evenly spaced
+        weight=[hardening,softening];
+        %curve with 100 data points
+        %append 0.01 stress value
+        sc_n = [sc_n]; %normalized
+        ine = [ine];
+        o_c = [o_c];
+    else %if it is e001
+        %linear shifting in softening branch (zero at fcm, 1 at last value)
+        softening=linspace(0,1,num-1-length(hardening));
+        if ec1/ecu1 < .9
+            interp=softening(2);
+        else
+            interp=2;
+        end
+        %due to simply appending the 0.01 stress value to the stress array,
+        %values are not evenly spaced, last value needs adaptions
+        weight=[hardening,softening, (ine001-ine(end))/(ine(end)-ine(end-1))*(interp-softening(1))+1];
+        %curve with 101 data points
+        %append 0.01 stress value
+        sc_n = [sc_n,0.01]; %normalized
+        ine = [ine,ine001];
+        o_c = [o_c,o_c_max];
+    end
+        
     %initialization of weight/shift factor
     gfi_factor=0;
     
@@ -610,10 +749,7 @@ else % if compression softening is accounted for
     end
     
     %compression damage output
-    o_c_out = [o_c(idx)];   
-    
-    %plot xlim
-    elim=max(ine);   
+    o_c_out = [o_c(idx)];     
     
     %regularization warning
     set(handles.text_softening,'string','Warning: compressive softening causes mesh dependent results')
@@ -621,6 +757,9 @@ else % if compression softening is accounted for
     %reset iteration counter
     n=0;
 end
+
+%plot xlim
+elim=max(ine);
 
 %plastic strain
 pe = ine/1000 - o_c./(1-o_c).*sc_n/Ecm*fcm;
@@ -655,7 +794,7 @@ omc_iu_out =[o_c_out;ine_out/1000];
 % plastic strain
     %plot(handles.axes2, ine, pe, [0,max(ine)],[0,max(ine)],'k:')
     plot(handles.axes2, pe)
-    % xlim(handles.axes2,[0,elim]); 
+    xlim(handles.axes2,[0,200]); 
     % ylim(handles.axes2,[0,elim]);
     %xlabel(handles.axes2,'inelastic strain (1/1000)');
     xlabel(handles.axes2,'index');
@@ -668,6 +807,8 @@ omc_iu_out =[o_c_out;ine_out/1000];
         ylim(handles.axes1,[0,round(fcm+5,-1)]);
         hold(handles.axes1, 'on' )
         plot(handles.axes1,ine_out, sc_out, 'k--+')
+        plot(handles.axes1,[ine(I),ine(I)], [-fcm,2*fcm], 'k:')
+        plot(handles.axes1,[ine(end-1),ine(end-1)], [-fcm,2*fcm], 'k:')
         hold(handles.axes1, 'off' )
         
 %damage strain
@@ -679,6 +820,7 @@ omc_iu_out =[o_c_out;ine_out/1000];
         plot(handles.axes1,ine_out, o_c_out, 'k--+')
         hold(handles.axes1, 'off' )
 
+%         xlim(handles.axes1,[-.5*ine(I),ine(I)]); 
         xlim(handles.axes1,[0,elim]); 
         xlabel(handles.axes1,'inelastic strain (1/1000)');
 
@@ -705,6 +847,7 @@ omc_iu_out =[o_c_out;ine_out/1000];
         ylim(handles.axes4,[0,round(fctm+.5,0)]);
         hold(handles.axes4, 'on' )
         plot(handles.axes4,iu_out, st_out,'k--+')
+        plot(handles.axes4, st_out,'k--+')
         hold(handles.axes4, 'off' )
 
 %damage displacement
@@ -849,7 +992,7 @@ fprintf(fid,'%s\n',handles.edit_d_t.String);
 fprintf(fid,'%s\n',handles.edit_points_t.String);
 fprintf(fid,'%s\n',handles.edit_beta.String);
 
-fclose(fid)
+fclose(fid);
 
 % Menüpunkt save einschalten
 handles.save.Enable = 'on';
